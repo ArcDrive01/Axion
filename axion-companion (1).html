@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Axion — SAT Study Companion</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+:root{
+  --bg:#EEEFF2;
+  --grid-line:#E2E3E8;
+  --surface:#FAFAF8;
+  --surface-2:#E9EAEF;
+  --line:#D3D5DE;
+  --text:#14162B;
+  --muted:#5B6088;
+  --brand:#3E5BC4;
+  --brand-dim:#E4E7F2;
+  --signal:#278C68;      /* on-track / strength */
+  --flag:#D9534F;        /* priority / weak area */
+  --flag-dim:#F5E2E1;
+  --signal-dim:#DDEEE6;
+  --signal-text:#1F6E4E;
+  --flag-text:#B8393A;
+  --amber:#D99A2B;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  background-color:var(--bg);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size:28px 28px;
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+}
+.mono{ font-family:'IBM Plex Mono',monospace; }
+
+/* ---------- Top bar ---------- */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:16px 28px;
+  border-bottom:1px solid var(--line);
+  position:sticky; top:0; background:rgba(238,239,242,0.92); backdrop-filter:blur(8px);
+  z-index:50;
+}
+.auth-box{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.auth-input{
+  width:150px; padding:7px 10px; font-size:12px; border-radius:8px; border:1px solid var(--line);
+  background:var(--surface-2); font-family:'Inter',sans-serif; color:var(--text);
+}
+.auth-input:focus{ outline:none; border-color:var(--brand); }
+.auth-status{ font-size:12px; color:var(--muted); font-family:'IBM Plex Mono',monospace; white-space:nowrap; }
+.brand{ display:flex; align-items:center; gap:10px; }
+.brand-mark{
+  width:30px;height:30px;border-radius:8px;
+  background:linear-gradient(135deg,var(--brand),#7C8FD6);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; color:#fff;
+  box-shadow:0 2px 6px rgba(62,91,196,0.28);
+}
+.brand-name{ font-family:'Space Grotesk',sans-serif; font-weight:700; letter-spacing:-0.02em; font-size:16px;}
+.brand-name span{ color:var(--muted); font-weight:500; font-size:11px; display:block; font-family:'IBM Plex Mono',monospace; letter-spacing:0.05em;}
+
+.tabs{ display:flex; gap:4px; }
+.tab-btn{
+  background:none; border:none; color:var(--muted); font-family:'Inter',sans-serif;
+  font-size:13.5px; font-weight:600; padding:9px 14px; border-radius:20px; cursor:pointer;
+  transition:all .15s ease;
+}
+.tab-btn:hover{ color:var(--text); background:var(--surface-2); }
+.tab-btn.active{ color:#fff; background:var(--brand); }
+
+.container{ max-width:980px; margin:0 auto; padding:36px 28px 90px; }
+.view{ display:none; animation:fade .25s ease; }
+.view.active{ display:block; }
+@keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+h1{ font-family:'Space Grotesk',sans-serif; font-size:30px; font-weight:700; letter-spacing:-0.02em; margin-bottom:6px;}
+h2{ font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:700; letter-spacing:-0.01em; margin-bottom:14px;}
+.eyebrow{
+  font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--brand);
+  letter-spacing:0.12em; text-transform:uppercase; margin-bottom:10px; font-weight:600;
+}
+.lede{ color:var(--muted); font-size:14.5px; line-height:1.6; margin-bottom:28px; max-width:640px;}
+
+.card{
+  background:var(--surface); border:1px solid var(--line); border-radius:14px;
+  padding:22px; margin-bottom:16px; box-shadow:0 1px 3px rgba(20,22,43,0.05);
+  position:relative;
+}
+.card-row{ display:flex; gap:16px; flex-wrap:wrap; }
+.card-row .card{ flex:1; min-width:240px; }
+
+label{ display:block; font-size:12.5px; font-weight:600; color:var(--muted); margin-bottom:7px; }
+input[type=number], select{
+  width:100%; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+  padding:10px 12px; border-radius:9px; font-size:14px; font-family:'IBM Plex Mono',monospace;
+}
+input[type=number]:focus, select:focus{ outline:none; border-color:var(--brand); }
+.field{ margin-bottom:16px; }
+.field-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+.btn{
+  background:var(--brand); color:#fff; border:none; font-weight:700; font-size:14px;
+  padding:11px 20px; border-radius:10px; cursor:pointer; transition:transform .1s ease, filter .15s;
+  font-family:'Inter',sans-serif;
+}
+.btn:hover{ filter:brightness(1.08); }
+.btn:active{ transform:scale(0.98); }
+.btn-ghost{
+  background:none; border:1px solid var(--line); color:var(--text); font-weight:600; font-size:13.5px;
+  padding:9px 16px; border-radius:10px; cursor:pointer;
+}
+.btn-ghost:hover{ border-color:var(--brand); color:var(--brand); }
+
+/* readout bars — the signature element */
+.readout{ display:flex; flex-direction:column; gap:10px; }
+.readout-row{ display:flex; align-items:center; gap:12px; }
+.readout-label{ width:210px; font-size:13px; font-weight:600; flex-shrink:0; }
+.readout-track{ flex:1; height:10px; background:var(--surface-2); border-radius:5px; overflow:hidden; position:relative;}
+.readout-fill{ height:100%; border-radius:5px; transition:width .5s ease; }
+.readout-pct{ width:42px; text-align:right; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted); flex-shrink:0;}
+.badge{
+  font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:700; padding:2px 8px;
+  border-radius:20px; letter-spacing:0.03em; flex-shrink:0;
+}
+.badge-priority{ background:var(--flag-dim); color:var(--flag-text); }
+.badge-solid{ background:var(--signal-dim); color:var(--signal-text); }
+
+.quiz-q{ border-bottom:1px solid var(--line); padding-bottom:20px; margin-bottom:20px; }
+.quiz-q:last-child{ border:none; margin:0; padding:0;}
+.quiz-domain-tag{
+  font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--amber);
+  text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px; font-weight:700;
+}
+.quiz-passage{
+  background:var(--surface-2); border-left:3px solid var(--brand); padding:12px 14px;
+  font-size:13.5px; color:var(--muted); margin-bottom:12px; border-radius:0 8px 8px 0; line-height:1.55;
+}
+.quiz-stem{ font-size:14.5px; margin-bottom:12px; font-weight:500; }
+.opts{ display:flex; flex-direction:column; gap:8px; }
+.opt{
+  display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1.5px solid var(--line);
+  border-radius:9px; cursor:pointer; font-size:13.5px; transition:all .12s ease; background:var(--surface);
+}
+.opt:hover{ border-color:var(--brand); }
+.opt.selected{ border-color:var(--brand); background:var(--brand-dim); }
+.opt.correct{ border-color:var(--signal); background:var(--signal-dim); }
+.opt.incorrect{ border-color:var(--flag); background:var(--flag-dim); }
+.opt-letter{
+  font-family:'IBM Plex Mono',monospace; font-weight:700; font-size:12px; color:var(--muted);
+  width:18px; flex-shrink:0;
+}
+
+.domain-card{ display:flex; gap:18px; }
+.domain-num{ font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; color:var(--brand-dim); flex-shrink:0; width:36px;}
+.domain-body h3{ font-family:'Space Grotesk',sans-serif; font-size:15.5px; margin-bottom:4px; }
+.domain-body .meta{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); margin-bottom:8px; }
+.domain-body p{ font-size:13.5px; color:var(--muted); line-height:1.6; margin-bottom:8px;}
+.skill-tags{ display:flex; flex-wrap:wrap; gap:6px; }
+.skill-tag{ font-size:11px; background:var(--surface-2); color:var(--muted); padding:3px 9px; border-radius:20px; font-family:'IBM Plex Mono',monospace;}
+
+.plan-week{ display:flex; gap:14px; align-items:flex-start; padding:14px 0; border-bottom:1px solid var(--line); }
+.plan-week:last-child{ border:none; }
+.plan-week-num{ font-family:'IBM Plex Mono',monospace; font-weight:700; color:var(--brand); font-size:13px; width:56px; flex-shrink:0; padding-top:2px;}
+.plan-focus{ font-size:14px; font-weight:600; margin-bottom:4px; }
+.plan-detail{ font-size:13px; color:var(--muted); line-height:1.5; }
+
+.resource-item{ display:flex; justify-content:space-between; align-items:center; padding:13px 0; border-bottom:1px solid var(--line); }
+.resource-item:last-child{ border:none; }
+.resource-name{ font-weight:600; font-size:14px; }
+.resource-desc{ font-size:12.5px; color:var(--muted); margin-top:2px;}
+.resource-link{ color:var(--brand); text-decoration:none; font-size:12.5px; font-weight:700; font-family:'IBM Plex Mono',monospace; flex-shrink:0; margin-left:16px;}
+.resource-link:hover{ text-decoration:underline; }
+
+.empty-state{ text-align:center; padding:50px 20px; color:var(--muted); }
+.empty-state .btn{ margin-top:16px; }
+
+.progress-check{ display:flex; align-items:center; gap:10px; padding:9px 0; }
+.progress-check input{ width:16px; height:16px; accent-color:var(--brand); }
+.progress-check label{ margin:0; color:var(--text); font-size:13.5px; font-weight:500; cursor:pointer; }
+.progress-check.done label{ color:var(--muted); text-decoration:line-through; }
+
+.stat-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:24px; }
+.stat-card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px; text-align:center;}
+.stat-num{ font-family:'Space Grotesk',sans-serif; font-size:26px; font-weight:700; color:var(--brand); }
+.stat-label{ font-size:11.5px; color:var(--muted); margin-top:4px; text-transform:uppercase; letter-spacing:0.05em;}
+
+.ref-grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.ref-card h3{ font-family:'Space Grotesk',sans-serif; font-size:14.5px; margin-bottom:10px; color:var(--brand); }
+.ref-list{ list-style:none; }
+.ref-list li{ font-size:13px; color:var(--muted); line-height:1.6; padding:4px 0 4px 16px; position:relative; }
+.ref-list li::before{ content:"→"; position:absolute; left:0; color:var(--brand); }
+.ref-list li b{ color:var(--text); font-weight:600; }
+.formula-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.formula-table td{ padding:7px 8px; border-bottom:1px solid var(--line); }
+.formula-table td:first-child{ color:var(--muted); width:45%; }
+.formula-table td:last-child{ font-family:'IBM Plex Mono',monospace; color:var(--brand); font-weight:600; }
+.ref-note{
+  background:var(--surface-2); border-left:3px solid var(--amber); padding:10px 14px;
+  font-size:12.5px; color:var(--muted); border-radius:0 8px 8px 0; margin-top:10px; line-height:1.55;
+}
+.subsection-label{
+  font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); text-transform:uppercase;
+  letter-spacing:0.08em; margin:22px 0 10px; font-weight:700;
+}
+.subsection-label:first-child{ margin-top:0; }
+
+@media (max-width:640px){
+  .tabs{ display:none; }
+  .field-grid{ grid-template-columns:1fr; }
+  .stat-grid{ grid-template-columns:1fr; }
+  .readout-label{ width:130px; font-size:11.5px; }
+  .ref-grid{ grid-template-columns:1fr; }
+}
+
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">↗</div>
+    <div class="brand-name">Axion<span>SAT STUDY COMPANION</span></div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" data-view="dashboard">Dashboard</button>
+    <button class="tab-btn" data-view="diagnostic">Diagnostic</button>
+    <button class="tab-btn" data-view="sections">Section Guide</button>
+    <button class="tab-btn" data-view="strategy">Strategy & Formulas</button>
+    <button class="tab-btn" data-view="resources">Resources</button>
+    <button class="tab-btn" data-view="progress">Progress</button>
+  </div>
+  <div class="auth-box" id="authBox"></div>
+</div>
+
+<div class="container">
+
+  <!-- DASHBOARD -->
+  <div class="view active" id="view-dashboard">
+    <div class="eyebrow">Your plan</div>
+    <h1>Study Dashboard</h1>
+    <p class="lede">Your priority ranking and weekly plan, generated from your score input and diagnostic quiz results.</p>
+    <div id="dashboard-content"></div>
+  </div>
+
+  <!-- DIAGNOSTIC -->
+  <div class="view" id="view-diagnostic">
+    <div class="eyebrow">Step 1</div>
+    <h1>Score Input & Diagnostic</h1>
+    <p class="lede">Enter a past score if you have one, set your weekly study time, then take the 24-question diagnostic (3 per domain). This calibrates the whole plan — like Module 1 calibrates Module 2 on test day.</p>
+
+    <div class="card">
+      <h2>Prior score (optional)</h2>
+      <div class="field">
+        <label>Have you taken the SAT or PSAT before?</label>
+        <select id="hasScore">
+          <option value="no">No prior score — start from diagnostic only</option>
+          <option value="yes">Yes — I'll enter my score</option>
+        </select>
+      </div>
+      <div id="scoreFields" style="display:none;">
+        <div class="field-grid">
+          <div class="field">
+            <label>Reading & Writing score (200–800)</label>
+            <input type="number" id="rwScore" min="200" max="800" placeholder="e.g. 560">
+          </div>
+          <div class="field">
+            <label>Math score (200–800)</label>
+            <input type="number" id="mathScore" min="200" max="800" placeholder="e.g. 610">
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Hours per week you can realistically study</label>
+        <input type="number" id="hoursWeek" min="1" max="30" value="6">
+      </div>
+      <div class="field">
+        <label>Target test date is roughly how many weeks away?</label>
+        <input type="number" id="weeksOut" min="1" max="24" value="8">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Diagnostic quiz — <span id="quizProgress" class="mono">0 / 24 answered</span></h2>
+      <div id="quizContainer"></div>
+      <button class="btn" id="submitQuiz" style="margin-top:8px;">Generate my study plan</button>
+    </div>
+  </div>
+
+  <!-- SECTIONS -->
+  <div class="view" id="view-sections">
+    <div class="eyebrow">Reference</div>
+    <h1>Section & Module Breakdown</h1>
+    <p class="lede">The Digital SAT has two sections — Reading & Writing and Math — each split into two adaptive modules. How you do on Module 1 sets the difficulty (and score ceiling) of Module 2, so accuracy early matters more than people expect.</p>
+
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num">64 min</div><div class="stat-label">Reading & Writing · 54Q</div></div>
+      <div class="stat-card"><div class="stat-num">70 min</div><div class="stat-label">Math · 44Q</div></div>
+      <div class="stat-card"><div class="stat-num">400–1600</div><div class="stat-label">Total score range</div></div>
+    </div>
+
+    <h2 style="margin-top:8px;">Reading & Writing — 4 domains</h2>
+    <div id="rw-domains"></div>
+
+    <h2 style="margin-top:28px;">Math — 4 domains</h2>
+    <div id="math-domains"></div>
+  </div>
+
+  <!-- STRATEGY & FORMULAS -->
+  <div class="view" id="view-strategy">
+    <div class="eyebrow">Quick reference</div>
+    <h1>Strategy & Formula Sheet</h1>
+    <p class="lede">A condensed reference for approach and recall — not a replacement for practice, but useful to skim before a study session or the night before test day.</p>
+
+    <div class="card">
+      <h2>Reading & Writing — approach</h2>
+      <div class="subsection-label">General approach</div>
+      <ul class="ref-list">
+        <li>Read the question stem before you commit to reading the whole passage, form a rough prediction, then check it against the answer choices rather than reading all four cold.</li>
+        <li>Short passages reward precision over speed — skim past connective filler and pay closest attention to transitions and negation words ("but," "however," "not"), since they usually signal where the answer lives.</li>
+        <li>When a question asks you to fill in a blank or replace a word, restate the idea in your own words first, then match to the closest option.</li>
+      </ul>
+      <div class="subsection-label">Words in Context</div>
+      <ul class="ref-list">
+        <li>Look for a synonym or antonym cue elsewhere in the sentence for the missing word.</li>
+        <li>Treat the blank as if the original wording weren't there — don't anchor to it.</li>
+        <li>Avoid choosing a word you don't recognize unless you've ruled out every other option first.</li>
+      </ul>
+      <div class="subsection-label">Central Ideas & Details</div>
+      <ul class="ref-list">
+        <li>In nonfiction, the main idea usually sits near the opening or closing lines.</li>
+        <li>In fiction or narrative passages, the main idea tends to build gradually across the whole text rather than sitting in one line.</li>
+        <li>For detail questions, scan for the exact keyword from the question (or a close synonym) rather than re-reading everything.</li>
+      </ul>
+      <div class="subsection-label">Structure & Purpose</div>
+      <ul class="ref-list">
+        <li>"Purpose" questions ask what a sentence or paragraph <i>does</i>, not just what it says — expect the correct answer to be phrased generally rather than tied to one specific detail.</li>
+        <li>For an underlined phrase, judge its function relative to the sentence right before and after it.</li>
+      </ul>
+      <div class="subsection-label">Inference & Evidence</div>
+      <ul class="ref-list">
+        <li>For inference questions, expect to read the full passage rather than one line — inferences are built from context, not a single sentence.</li>
+        <li>For evidence questions, state the claim in plain words first, then check whether the graphic or textual evidence actually supports that specific claim (not just the general topic).</li>
+      </ul>
+      <div class="subsection-label">Cross-Text Connections</div>
+      <ul class="ref-list">
+        <li>Identify the first text's point of view, then re-read the second text as if you held that same opinion — this makes agreement/disagreement questions much faster to answer.</li>
+        <li>When asked what both texts would agree on, look for overlapping specific details, not just a shared general topic.</li>
+      </ul>
+      <div class="subsection-label">Expression of Ideas</div>
+      <ul class="ref-list">
+        <li>For transitions: read the sentence before and after the blank, name the logical relationship (contrast, cause-effect, addition, example), then pick the word that matches — don't just plug in what "sounds fine."</li>
+        <li>For rhetorical synthesis (combining bullet points): identify exactly what the question asks you to accomplish, then eliminate any choice that does something else — adds a comparison when none was asked for, states a conclusion when a purpose was asked for, etc.</li>
+      </ul>
+      <div class="subsection-label">Standard English Conventions</div>
+      <ul class="ref-list">
+        <li>Every complete sentence needs a subject and a verb, and cannot start with only a dependent clause.</li>
+        <li>A comma alone cannot join two complete sentences (a comma splice) — that requires a period, semicolon, or a conjunction.</li>
+        <li>Match subject and verb number even when other words sit in between them; check tense consistency across a sentence unless context signals a real time shift.</li>
+        <li>A modifying phrase before a comma must describe whatever comes immediately after the comma.</li>
+        <li>Semicolons function like periods most of the time; colons must follow a complete sentence and typically introduce a list, example, or explanation; dashes can set off extra information or take the place of a comma, colon, or semicolon.</li>
+      </ul>
+      <div class="subsection-label">Common wrong-answer patterns</div>
+      <ul class="ref-list">
+        <li>Watch for choices that are <b>too broad</b>, <b>too narrow</b>, <b>off-topic</b>, state the <b>opposite</b> of the correct meaning, use <b>extreme/absolute</b> wording, or slightly <b>distort</b> a true detail.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Math — formulas & rules</h2>
+      <div class="subsection-label">Linear equations</div>
+      <table class="formula-table">
+        <tr><td>Slope-intercept form</td><td>y = mx + b</td></tr>
+        <tr><td>Point-slope form</td><td>y − y₁ = m(x − x₁)</td></tr>
+        <tr><td>Standard form</td><td>Ax + By = C</td></tr>
+        <tr><td>Slope between two points</td><td>m = (y₁−y₂)/(x₁−x₂)</td></tr>
+        <tr><td>Parallel lines</td><td>same slope</td></tr>
+        <tr><td>Perpendicular lines</td><td>slopes are negative reciprocals</td></tr>
+      </table>
+      <div class="ref-note">A system of two linear equations has one solution where the lines cross, no solution if they're parallel, and infinite solutions if they're the same line.</div>
+
+      <div class="subsection-label">Quadratics</div>
+      <table class="formula-table">
+        <tr><td>Standard form</td><td>y = ax² + bx + c</td></tr>
+        <tr><td>Factored form</td><td>y = a(x − p)(x − q)</td></tr>
+        <tr><td>Vertex form</td><td>y = a(x − h)² + k</td></tr>
+        <tr><td>Quadratic formula</td><td>x = (−b ± √(b²−4ac)) / 2a</td></tr>
+        <tr><td>Axis of symmetry</td><td>x = −b/2a</td></tr>
+      </table>
+
+      <div class="subsection-label">Exponents & radicals</div>
+      <table class="formula-table">
+        <tr><td>Product rule</td><td>aᵐ · aⁿ = aᵐ⁺ⁿ</td></tr>
+        <tr><td>Quotient rule</td><td>aᵐ / aⁿ = aᵐ⁻ⁿ</td></tr>
+        <tr><td>Power rule</td><td>(aᵐ)ⁿ = aᵐⁿ</td></tr>
+        <tr><td>Zero exponent</td><td>a⁰ = 1</td></tr>
+        <tr><td>Negative exponent</td><td>a⁻ⁿ = 1/aⁿ</td></tr>
+        <tr><td>Fractional exponent</td><td>a^(m/n) = ⁿ√(aᵐ)</td></tr>
+      </table>
+
+      <div class="subsection-label">Percentages & ratios</div>
+      <ul class="ref-list">
+        <li>Percent change = (new − original) / original.</li>
+        <li>To increase by a percent, multiply by (1 + decimal form); to decrease, multiply by (1 − decimal form).</li>
+        <li>A proportion a/b = c/d can be solved by cross-multiplying: ad = bc.</li>
+        <li>Direct variation: y = kx (both increase together); inverse variation: xy = k (one increases as the other decreases).</li>
+      </ul>
+
+      <div class="subsection-label">Geometry & trigonometry</div>
+      <table class="formula-table">
+        <tr><td>Circle area / circumference</td><td>A = πr² &nbsp; C = 2πr</td></tr>
+        <tr><td>Arc length / sector area</td><td>(θ/360)·2πr &nbsp; (θ/360)·πr²</td></tr>
+        <tr><td>Triangle area</td><td>½·base·height</td></tr>
+        <tr><td>Pythagorean theorem</td><td>a² + b² = c²</td></tr>
+        <tr><td>SOH-CAH-TOA</td><td>sin=opp/hyp, cos=adj/hyp, tan=opp/adj</td></tr>
+        <tr><td>Degrees ↔ radians</td><td>180° = π radians</td></tr>
+        <tr><td>Rectangular prism volume</td><td>V = ℓwh</td></tr>
+        <tr><td>Cylinder volume</td><td>V = πr²h</td></tr>
+        <tr><td>Sphere volume</td><td>V = (4/3)πr³</td></tr>
+        <tr><td>Cone / pyramid volume</td><td>V = ⅓ × base area × height</td></tr>
+      </table>
+      <div class="ref-note">A right triangle's sides in a 30-60-90 or 45-45-90 pattern follow fixed ratios worth memorizing (e.g. 45-45-90 legs are equal and the hypotenuse is leg×√2) — this saves time versus solving from scratch on every question.</div>
+
+      <div class="subsection-label">Statistics & data</div>
+      <ul class="ref-list">
+        <li>Mean = sum ÷ count; median = middle value when ordered; mode = most frequent value.</li>
+        <li>Range = max − min; interquartile range (IQR) = Q3 − Q1, covering the middle 50% of the data.</li>
+        <li>Larger standard deviation means values are more spread out; smaller means they cluster near the mean.</li>
+        <li>Right-skewed data (long tail to the right) → mean is pulled above the median; left-skewed → mean is pulled below the median.</li>
+        <li>Be skeptical of answer choices using absolute language ("proves," "always," "never") — correct SAT answers about data usually use hedged wording like "suggests" or "indicates."</li>
+      </ul>
+
+      <div class="subsection-label">Probability</div>
+      <ul class="ref-list">
+        <li>Probability = favorable outcomes ÷ total outcomes.</li>
+        <li>"And" (both events happen) → multiply probabilities if independent.</li>
+        <li>"Or" (either event happens) → add probabilities, then subtract any overlap if the events aren't mutually exclusive.</li>
+        <li>Without replacement, the total outcomes shrink for the second event — don't treat dependent events as independent.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- RESOURCES -->
+  <div class="view" id="view-resources">
+    <div class="eyebrow">Library</div>
+    <h1>Study Resources</h1>
+    <p class="lede">Free and low-cost resources mapped to what actually shows up on the Digital SAT. Start with the official ones — they're built on real retired questions and the actual Bluebook interface.</p>
+    <div class="card">
+      <h2>Official / free</h2>
+      <div id="resources-official"></div>
+    </div>
+    <div class="card">
+      <h2>Structured practice (free tier)</h2>
+      <div id="resources-practice"></div>
+    </div>
+    <div class="card">
+      <h2>Paid programs (if you want more structure)</h2>
+      <div id="resources-paid"></div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="view" id="view-progress">
+    <div class="eyebrow">Tracking</div>
+    <h1>Progress</h1>
+    <p class="lede">Check off each week's focus as you complete it. This session resets if you close the tab — screenshot your plan or re-run the diagnostic before you go.</p>
+    <div class="card" id="progress-content"></div>
+  </div>
+
+</div>
+
+<script>
+/* ---------------- DATA ---------------- */
+const DOMAINS = [
+  {id:'craft', section:'rw', name:'Craft & Structure', meta:'~13–15 questions · vocab in context, text structure, cross-text connections',
+    desc:'Tests precise word meaning in context, how a passage is organized, and how two related texts relate to each other.',
+    skills:['Words in Context','Text Structure & Purpose','Cross-Text Connections']},
+  {id:'info', section:'rw', name:'Information & Ideas', meta:'~12–14 questions · central ideas, evidence, inferences',
+    desc:'Tests whether you can identify a passage\'s main point, find evidence that supports or weakens a claim, and draw logical inferences.',
+    skills:['Central Ideas & Details','Command of Evidence','Inferences']},
+  {id:'conventions', section:'rw', name:'Standard English Conventions', meta:'~11–15 questions · grammar & mechanics',
+    desc:'Tests sentence boundaries, punctuation, subject-verb and pronoun agreement — the rules-based, most-fixable domain on the test.',
+    skills:['Boundaries (commas/semicolons)','Sentence Structure','Agreement']},
+  {id:'expression', section:'rw', name:'Expression of Ideas', meta:'~8–12 questions · transitions & rhetorical synthesis',
+    desc:'Tests whether you can pick the most logical transition word and synthesize bullet-point notes into one coherent sentence.',
+    skills:['Transitions','Rhetorical Synthesis']},
+  {id:'algebra', section:'math', name:'Algebra', meta:'~13–15 questions · linear equations, systems, inequalities',
+    desc:'Linear equations and inequalities in one or two variables, and systems of two linear equations.',
+    skills:['Linear equations','Systems of equations','Linear inequalities']},
+  {id:'advmath', section:'math', name:'Advanced Math', meta:'~13–15 questions · quadratics, exponentials, nonlinear functions',
+    desc:'Nonlinear equations and functions — quadratics, exponentials, and manipulating expressions.',
+    skills:['Quadratics','Exponential functions','Equivalent expressions']},
+  {id:'psda', section:'math', name:'Problem-Solving & Data Analysis', meta:'~5–7 questions · ratios, percentages, data',
+    desc:'Ratios, rates, percentages, and interpreting data in tables, scatterplots, and models.',
+    skills:['Ratios & rates','Percentages','Data interpretation']},
+  {id:'geotrig', section:'math', name:'Geometry & Trigonometry', meta:'~5–7 questions · area, volume, triangles, trig',
+    desc:'Area and volume formulas, triangle relationships including the Pythagorean theorem, and right-triangle trigonometry.',
+    skills:['Area & volume','Triangles & the Pythagorean theorem','Trig ratios']},
+];
+
+const QUIZ = [
+  {domain:'craft', passage:'The committee\'s decision, though ______ by outside observers, was in fact the product of months of careful deliberation.', stem:'Which choice completes the text with the most logical and precise word?',
+    opts:['celebrated','impulsive-seeming','anticipated','unanimous'], correct:1},
+  {domain:'craft', passage:'Paragraph 1 introduces a scientist\'s hypothesis. Paragraph 2 presents an experiment that contradicts it. Paragraph 3 proposes a revised hypothesis.', stem:'What is the primary purpose of Paragraph 2 in this structure?',
+    opts:['To summarize Paragraph 1','To provide evidence that challenges the initial hypothesis','To introduce a new, unrelated topic','To restate the conclusion'], correct:1},
+  {domain:'craft', passage:'Text 1 argues city parks reduce urban heat. Text 2 argues the effect is minor compared to building materials.', stem:'How would the author of Text 2 most likely respond to Text 1\'s claim?',
+    opts:['By agreeing completely','By suggesting the claim overstates the effect of one factor among several','By rejecting the existence of urban heat','By praising the methodology'], correct:1},
+
+  {domain:'info', passage:'A study found that students who took short breaks every 25 minutes retained 15% more material than those who studied in one long block, though total study time was identical.', stem:'Which choice best states the main finding of the study?',
+    opts:['Longer study sessions are always better','Break frequency, not total time, affected retention in this study','Students prefer studying in blocks','All students retain the same amount regardless of method'], correct:1},
+  {domain:'info', passage:'A researcher claims that coral bleaching events are increasing due to ocean warming, citing a 20-year dataset from three reef systems.', stem:'Which finding, if true, would most directly support the researcher\'s claim?',
+    opts:['A dataset from a fourth reef system also shows a bleaching increase correlated with rising temperatures','Coral reefs exist in over 100 countries','Bleaching was first documented in the 1980s','Some corals recover after bleaching'], correct:0},
+  {domain:'info', passage:'The article notes that the town\'s library added weekend hours last year and that visitor numbers have since risen 30%.', stem:'What can reasonably be inferred from this passage?',
+    opts:['The extended hours caused all library growth nationally','Weekend availability plausibly contributed to increased visits at this library','The library will close on weekdays','Visitor numbers will keep rising at the same rate forever'], correct:1},
+
+  {domain:'conventions', passage:'The scientists, who had worked on the project for a decade, ______ finally ready to publish their findings.', stem:'Which choice completes the sentence with correct subject-verb agreement?',
+    opts:['was','is','were','being'], correct:2},
+  {domain:'conventions', passage:'She packed her bags quickly ______ she still forgot her passport.', stem:'Which choice best joins the two ideas?',
+    opts:[', and','; however,',', because','and therefore'], correct:1},
+  {domain:'conventions', passage:'Running for over an hour the marathoner finally saw the finish line ahead.', stem:'Which choice fixes the punctuation error in this sentence?',
+    opts:['Running for over an hour, the marathoner finally saw the finish line ahead.','Running, for over an hour the marathoner finally saw the finish line ahead.','Running for over an hour the marathoner, finally saw the finish line ahead.','No change needed'], correct:0},
+
+  {domain:'expression', passage:'The bridge was closed for repairs. ______, traffic downtown increased significantly.', stem:'Which transition best completes the text?',
+    opts:['For example','As a result','In contrast','Similarly'], correct:1},
+  {domain:'expression', passage:'Notes: (1) The museum added a new wing in 2019. (2) The wing houses modern art. (3) Attendance rose 40% after it opened.', stem:'Which choice most effectively combines the information into one sentence to make a point about the new wing\'s impact?',
+    opts:['The museum added a new wing in 2019, and it houses modern art.','After the museum\'s 2019 modern-art wing opened, attendance rose 40%.','The museum is old and has modern art now.','Modern art is popular at museums.'], correct:1},
+  {domain:'expression', passage:'The recipe calls for two cups of flour. ______, it also requires a full teaspoon of salt.', stem:'Which transition best completes the text?',
+    opts:['Additionally','Nevertheless','Instead','As a result'], correct:0},
+
+  {domain:'algebra', passage:'3x + 7 = 22', stem:'What is the value of x?', opts:['3','5','7','15'], correct:1},
+  {domain:'algebra', passage:'2x + y = 10 and x − y = 2', stem:'What is the value of x in this system?', opts:['2','3','4','6'], correct:2},
+  {domain:'algebra', passage:'5x − 3 > 12', stem:'Which describes all solutions to this inequality?', opts:['x > 3','x < 3','x > 1.8','x < 1.8'], correct:0},
+
+  {domain:'advmath', passage:'x² − 5x + 6 = 0', stem:'What are the solutions for x?', opts:['x = 1, 6','x = 2, 3','x = -2, -3','x = 6, -1'], correct:1},
+  {domain:'advmath', passage:'f(x) = 2^x', stem:'What is f(3)?', opts:['6','8','9','16'], correct:1},
+  {domain:'advmath', passage:'(x + 4)(x − 2)', stem:'Which expression is equivalent?', opts:['x² + 2x − 8','x² − 2x + 8','x² + 6x − 8','x² − 8'], correct:0},
+
+  {domain:'psda', passage:'A shirt priced at $40 is discounted by 25%.', stem:'What is the sale price?', opts:['$10','$28','$30','$35'], correct:2},
+  {domain:'psda', passage:'A recipe uses a 3:2 ratio of flour to sugar. If 12 cups of flour are used,', stem:'how many cups of sugar are needed?', opts:['6','8','9','18'], correct:1},
+  {domain:'psda', passage:'A scatterplot shows a generally negative association between hours of TV watched and test scores, with one clear outlier scoring high despite heavy TV use.', stem:'What does this scatterplot best show?', opts:['A perfect negative correlation with no exceptions','A general negative trend, with at least one outlier','A positive correlation','No relationship at all'], correct:1},
+
+  {domain:'geotrig', passage:'A rectangle has a length of 9 and a width of 4.', stem:'What is its area?', opts:['13','26','36','40'], correct:2},
+  {domain:'geotrig', passage:'A right triangle has legs of length 6 and 8.', stem:'What is the length of the hypotenuse?', opts:['9','10','12','14'], correct:1},
+  {domain:'geotrig', passage:'In a right triangle, the angle θ has an opposite side of 3 and a hypotenuse of 5.', stem:'What is sin(θ)?', opts:['3/5','4/5','5/3','3/4'], correct:0},
+];
+
+const RESOURCES = {
+  official:[
+    {name:'Bluebook (College Board)', desc:'The actual testing app — take official full-length adaptive practice tests here so the interface feels familiar on test day.', link:'https://bluebook.collegeboard.org'},
+    {name:'SAT Suite Question Bank', desc:'College Board\'s searchable bank of real retired questions, filterable by domain and difficulty.', link:'https://satsuite.collegeboard.org/sat/practice-preparation'},
+    {name:'Khan Academy — Official SAT Practice', desc:'Free, College Board-endorsed practice with personalized recommendations linked to your PSAT/SAT scores.', link:'https://www.khanacademy.org/sat'},
+  ],
+  practice:[
+    {name:'r/SAT (Reddit)', desc:'Community Q&A, score reports, and shared strategy — good for staying motivated and troubleshooting specific questions.', link:'https://www.reddit.com/r/Sat/'},
+    {name:'CollegeVine / community blogs', desc:'Free strategy articles on pacing, the Desmos calculator, and domain-specific tips.', link:'https://www.collegevine.com/blog'},
+  ],
+  paid:[
+    {name:'Princeton Review', desc:'Structured courses and books with drilling by domain.', link:'https://www.princetonreview.com'},
+    {name:'UWorld SAT', desc:'Large question bank with detailed explanations, popular for Math drilling.', link:'https://www.uworld.com/sat'},
+  ]
+};
+
+/* ---------------- SUPABASE CONFIG ---------------- */
+// Replace these two with your actual Project URL and anon public key
+// from Supabase → Project Settings → API. Until you do, the app runs
+// in guest mode (progress only lasts for the current tab).
+const SUPABASE_URL = "https://lscbjauuvcxjhhucfkza.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzY2JqYXV1dmN4amhodWNma3phIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM2MjY1MTEsImV4cCI6MjA5OTIwMjUxMX0.sk1hAMa5X2v7tNCuY6TQcqhAXk-RT7QzhD2b7FBzHE0";
+
+let supabase = null;
+let currentUser = null;
+let saveTimer = null;
+
+if (SUPABASE_URL !== "YOUR_SUPABASE_URL" && window.supabase) {
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+function renderAuthBox(){
+  const box = document.getElementById('authBox');
+  if(!supabase){
+    box.innerHTML = `<span class="auth-status">Guest mode — progress resets on refresh</span>`;
+    return;
+  }
+  if(currentUser){
+    box.innerHTML = `
+      <span class="auth-status">${currentUser.email}</span>
+      <button class="btn-ghost" id="signOutBtn" style="padding:6px 12px; font-size:12px;">Sign out</button>`;
+    document.getElementById('signOutBtn').addEventListener('click', async ()=>{
+      await supabase.auth.signOut();
+    });
+  } else {
+    box.innerHTML = `
+      <input type="email" id="authEmail" class="auth-input" placeholder="you@email.com">
+      <button class="btn-ghost" id="sendMagicLink" style="padding:6px 12px; font-size:12px;">Save my progress</button>`;
+    document.getElementById('sendMagicLink').addEventListener('click', async ()=>{
+      const email = document.getElementById('authEmail').value.trim();
+      if(!email) return;
+      const btn = document.getElementById('sendMagicLink');
+      btn.textContent = 'Sending…'; btn.disabled = true;
+      const { error } = await supabase.auth.signInWithOtp({ email, options:{ emailRedirectTo: window.location.href } });
+      if(error){ alert('Error sending link: ' + error.message); btn.textContent='Save my progress'; btn.disabled=false; return; }
+      box.innerHTML = `<span class="auth-status">Check your email for a sign-in link ✓</span>`;
+    });
+  }
+}
+
+async function loadUserState(){
+  if(!supabase || !currentUser) return;
+  const { data, error } = await supabase
+    .from('user_state')
+    .select('state')
+    .eq('user_id', currentUser.id)
+    .maybeSingle();
+  if(error){ console.error('Load failed:', error); return; }
+  if(data && data.state && Object.keys(data.state).length){
+    state = data.state;
+    renderQuiz();
+    Object.keys(state.answers || {}).forEach(qi=>{
+      const oi = state.answers[qi];
+      const el = document.querySelector(`.opt[data-i="${qi}"][data-j="${oi}"]`);
+      if(el) el.classList.add('selected');
+    });
+    updateQuizProgress();
+    renderDashboard();
+    renderProgress();
+  }
+}
+
+function saveState(){
+  if(!supabase || !currentUser) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    const { error } = await supabase
+      .from('user_state')
+      .upsert({ user_id: currentUser.id, state, updated_at: new Date().toISOString() });
+    if(error) console.error('Save failed:', error);
+  }, 500);
+}
+
+if(supabase){
+  supabase.auth.getSession().then(({data})=>{
+    currentUser = data.session ? data.session.user : null;
+    renderAuthBox();
+    if(currentUser) loadUserState();
+  });
+  supabase.auth.onAuthStateChange((_event, session)=>{
+    currentUser = session ? session.user : null;
+    renderAuthBox();
+    if(currentUser) loadUserState();
+  });
+}
+
+/* ---------------- STATE ---------------- */
+let state = { answers:{}, domainAccuracy:{}, plan:null, checklist:{} };
+
+/* ---------------- TAB NAV ---------------- */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-'+btn.dataset.view).classList.add('active');
+  });
+});
+
+/* ---------------- SCORE FIELD TOGGLE ---------------- */
+document.getElementById('hasScore').addEventListener('change', e=>{
+  document.getElementById('scoreFields').style.display = e.target.value==='yes' ? 'block':'none';
+});
+
+/* ---------------- RENDER QUIZ ---------------- */
+function renderQuiz(){
+  const c = document.getElementById('quizContainer');
+  c.innerHTML = '';
+  QUIZ.forEach((q, i)=>{
+    const domainName = DOMAINS.find(d=>d.id===q.domain).name;
+    const div = document.createElement('div');
+    div.className='quiz-q';
+    div.innerHTML = `
+      <div class="quiz-domain-tag">${domainName}</div>
+      <div class="quiz-passage">${q.passage}</div>
+      <div class="quiz-stem">${q.stem}</div>
+      <div class="opts" data-q="${i}">
+        ${q.opts.map((o,j)=>`<div class="opt" data-i="${i}" data-j="${j}"><span class="opt-letter">${String.fromCharCode(65+j)}</span><span>${o}</span></div>`).join('')}
+      </div>`;
+    c.appendChild(div);
+  });
+  c.querySelectorAll('.opt').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const qi = parseInt(el.dataset.i), oi = parseInt(el.dataset.j);
+      const group = c.querySelector(`.opts[data-q="${qi}"]`);
+      group.querySelectorAll('.opt').forEach(o=>o.classList.remove('selected'));
+      el.classList.add('selected');
+      state.answers[qi] = oi;
+      updateQuizProgress();
+      saveState();
+    });
+  });
+}
+function updateQuizProgress(){
+  const answered = Object.keys(state.answers).length;
+  document.getElementById('quizProgress').textContent = `${answered} / ${QUIZ.length} answered`;
+}
+
+/* ---------------- SCORE → BASELINE ---------------- */
+function scoreToBaseline(score){
+  // maps 200-800 to a 0-100 baseline strength
+  return Math.max(0, Math.min(100, ((score-200)/600)*100));
+}
+
+/* ---------------- SUBMIT QUIZ / GENERATE PLAN ---------------- */
+document.getElementById('submitQuiz').addEventListener('click', ()=>{
+  if(Object.keys(state.answers).length < QUIZ.length){
+    if(!confirm(`You've answered ${Object.keys(state.answers).length}/${QUIZ.length} questions. Generate the plan anyway with unanswered ones marked incorrect?`)) return;
+  }
+  // score per domain
+  const domainStats = {};
+  DOMAINS.forEach(d=> domainStats[d.id] = {correct:0,total:0});
+  QUIZ.forEach((q,i)=>{
+    domainStats[q.domain].total++;
+    if(state.answers[i]===q.correct) domainStats[q.domain].correct++;
+  });
+
+  const hasScore = document.getElementById('hasScore').value==='yes';
+  const rwScore = parseInt(document.getElementById('rwScore').value) || 500;
+  const mathScore = parseInt(document.getElementById('mathScore').value) || 500;
+  const hoursWeek = parseInt(document.getElementById('hoursWeek').value) || 6;
+  const weeksOut = parseInt(document.getElementById('weeksOut').value) || 8;
+
+  const baselines = { rw: hasScore ? scoreToBaseline(rwScore) : 50, math: hasScore ? scoreToBaseline(mathScore) : 50 };
+
+  const results = DOMAINS.map(d=>{
+    const stat = domainStats[d.id];
+    const accuracy = stat.total ? (stat.correct/stat.total)*100 : 50;
+    const baseline = baselines[d.section];
+    const priority = (100-accuracy)*0.7 + (100-baseline)*0.3;
+    return {...d, accuracy, baseline, priority};
+  }).sort((a,b)=> b.priority - a.priority);
+
+  state.domainAccuracy = results;
+  state.plan = buildPlan(results, hoursWeek, weeksOut);
+  renderDashboard();
+  saveState();
+  // switch to dashboard
+  document.querySelector('.tab-btn[data-view="dashboard"]').click();
+});
+
+function buildPlan(results, hoursWeek, weeksOut){
+  const totalPriority = results.reduce((s,r)=>s+r.priority,0);
+  const weeklyPlan = [];
+  const topFocus = results.slice(0,4); // rotate through top 4 weakest domains
+  for(let w=1; w<=weeksOut; w++){
+    const focusDomain = topFocus[(w-1)%topFocus.length];
+    const domainHours = Math.max(1, Math.round(hoursWeek*0.55));
+    const practiceTestWeek = (w % 2 === 0);
+    weeklyPlan.push({
+      week:w,
+      focus: focusDomain.name,
+      hours: domainHours,
+      detail: practiceTestWeek
+        ? `${domainHours}h targeted drilling on ${focusDomain.name}, plus one full-length adaptive practice test in Bluebook this week to recheck pacing.`
+        : `${domainHours}h targeted drilling on ${focusDomain.name} (your current lowest-priority score), plus ${Math.max(1,hoursWeek-domainHours)}h mixed review across other domains.`
+    });
+  }
+  return { weeklyPlan, hoursWeek, weeksOut, generatedAt: new Date().toLocaleDateString() };
+}
+
+/* ---------------- RENDER DASHBOARD ---------------- */
+function renderDashboard(){
+  const el = document.getElementById('dashboard-content');
+  if(!state.plan){
+    el.innerHTML = `<div class="empty-state">
+      <p>No plan yet — take the diagnostic quiz first.</p>
+      <button class="btn" onclick="document.querySelector('.tab-btn[data-view=diagnostic]').click()">Go to Diagnostic</button>
+    </div>`;
+    return;
+  }
+  const results = state.domainAccuracy;
+  const rows = results.map(r=>{
+    const isPriority = r.priority > 55;
+    const color = isPriority ? 'var(--flag)' : 'var(--signal)';
+    return `<div class="readout-row">
+      <div class="readout-label">${r.name}</div>
+      <div class="readout-track"><div class="readout-fill" style="width:${r.accuracy}%; background:${color};"></div></div>
+      <div class="readout-pct">${Math.round(r.accuracy)}%</div>
+      <div class="badge ${isPriority?'badge-priority':'badge-solid'}">${isPriority?'PRIORITY':'ON TRACK'}</div>
+    </div>`;
+  }).join('');
+
+  const planRows = state.plan.weeklyPlan.map(w=>`
+    <div class="plan-week">
+      <div class="plan-week-num">WK ${w.week}</div>
+      <div>
+        <div class="plan-focus">${w.focus}</div>
+        <div class="plan-detail">${w.detail}</div>
+      </div>
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="card">
+      <h2>Domain readout — diagnostic accuracy</h2>
+      <div class="readout">${rows}</div>
+    </div>
+    <div class="card">
+      <h2>${state.plan.weeksOut}-week plan · ${state.plan.hoursWeek}h/week</h2>
+      ${planRows}
+      <button class="btn-ghost" style="margin-top:14px;" onclick="document.querySelector('.tab-btn[data-view=progress]').click()">Track this plan →</button>
+    </div>
+  `;
+}
+
+/* ---------------- SECTIONS VIEW ---------------- */
+function renderDomains(sectionKey, containerId){
+  const c = document.getElementById(containerId);
+  const list = DOMAINS.filter(d=>d.section===sectionKey);
+  c.innerHTML = list.map((d,i)=>`
+    <div class="card domain-card">
+      <div class="domain-num">${String(i+1).padStart(2,'0')}</div>
+      <div class="domain-body">
+        <h3>${d.name}</h3>
+        <div class="meta">${d.meta}</div>
+        <p>${d.desc}</p>
+        <div class="skill-tags">${d.skills.map(s=>`<span class="skill-tag">${s}</span>`).join('')}</div>
+      </div>
+    </div>`).join('');
+}
+
+/* ---------------- RESOURCES VIEW ---------------- */
+function renderResources(){
+  const map = {official:'resources-official', practice:'resources-practice', paid:'resources-paid'};
+  Object.keys(map).forEach(key=>{
+    document.getElementById(map[key]).innerHTML = RESOURCES[key].map(r=>`
+      <div class="resource-item">
+        <div>
+          <div class="resource-name">${r.name}</div>
+          <div class="resource-desc">${r.desc}</div>
+        </div>
+        <a class="resource-link" href="${r.link}" target="_blank" rel="noopener">Visit ↗</a>
+      </div>`).join('');
+  });
+}
+
+/* ---------------- PROGRESS VIEW ---------------- */
+function renderProgress(){
+  const el = document.getElementById('progress-content');
+  if(!state.plan){
+    el.innerHTML = `<div class="empty-state"><p>Generate a plan first to start tracking weeks.</p></div>`;
+    return;
+  }
+  const doneCount = Object.values(state.checklist).filter(Boolean).length;
+  el.innerHTML = `
+    <div class="stat-grid" style="margin-bottom:20px;">
+      <div class="stat-card"><div class="stat-num">${doneCount}/${state.plan.weeksOut}</div><div class="stat-label">Weeks completed</div></div>
+      <div class="stat-card"><div class="stat-num">${state.plan.hoursWeek}h</div><div class="stat-label">Per week target</div></div>
+      <div class="stat-card"><div class="stat-num">${Math.round(state.domainAccuracy.reduce((s,r)=>s+r.accuracy,0)/state.domainAccuracy.length)}%</div><div class="stat-label">Avg diagnostic accuracy</div></div>
+    </div>
+  ` + state.plan.weeklyPlan.map(w=>`
+    <div class="progress-check ${state.checklist[w.week]?'done':''}">
+      <input type="checkbox" id="wk${w.week}" ${state.checklist[w.week]?'checked':''} onchange="toggleWeek(${w.week})">
+      <label for="wk${w.week}">Week ${w.week}: ${w.focus} — ${w.hours}h</label>
+    </div>`).join('');
+}
+function toggleWeek(w){
+  state.checklist[w] = !state.checklist[w];
+  renderProgress();
+  saveState();
+}
+
+/* ---------------- INIT ---------------- */
+renderAuthBox();
+renderQuiz();
+renderDomains('rw','rw-domains');
+renderDomains('math','math-domains');
+renderResources();
+renderDashboard();
+renderProgress();
+</script>
+</body>
+</html>
